@@ -61,6 +61,21 @@ func TestDisconnectedTailscaleHandlers(t *testing.T) {
 	}
 }
 
+func TestDisconnectedTailscaleStatusReportsRetry(t *testing.T) {
+	app := newTestApp(t)
+	app.tsLastError = "temporary DNS failure"
+	app.tsRetrying = true
+	rr := performJSON(app.handleTSStatus, http.MethodGet, "/api/tailscale/status", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d %s", rr.Code, rr.Body.String())
+	}
+	for _, want := range []string{`"status":"disconnected"`, `"retrying":true`, `"error":"temporary DNS failure"`} {
+		if !strings.Contains(rr.Body.String(), want) {
+			t.Fatalf("Tailscale retry status missing %q in %s", want, rr.Body.String())
+		}
+	}
+}
+
 func TestAboutAndConfigHandlers(t *testing.T) {
 	app := newTestApp(t)
 	app.tabs = []Tab{{ID: "b", Type: "browser", URL: "http://example"}}
