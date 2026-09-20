@@ -87,6 +87,31 @@ func TestNavigateAndNewBrowserNormalizeURL(t *testing.T) {
 	}
 }
 
+func TestBlankBrowserTabIsTrackedWithoutPersisting(t *testing.T) {
+	app := newTestApp(t)
+	t.Setenv("APPDATA", t.TempDir())
+	manager := newFakeContentManager()
+	app.contentViews = manager
+	app.registerLocalTab(`{"id":"browser-blank","type":"browser","title":"ignored","url":"about:blank"}`)
+	if len(app.tabs) != 1 || app.tabs[0].Title != "New tab" || app.activeTab != "browser-blank" {
+		t.Fatalf("blank tab state = active %q tabs %+v", app.activeTab, app.tabs)
+	}
+	if len(app.config.OpenTabs) != 0 {
+		t.Fatalf("blank tab persisted in recent tabs: %+v", app.config.OpenTabs)
+	}
+	app.switchTab("browser-blank")
+	if manager.hideAlls == 0 || len(manager.views) != 0 {
+		t.Fatalf("blank tab should show shell only: hideAll=%d views=%d", manager.hideAlls, len(manager.views))
+	}
+	app.navigateBrowser("example.com")
+	if got := app.tabs[0].URL; got != "http://example.com" {
+		t.Fatalf("blank tab navigation URL = %q", got)
+	}
+	if view := manager.views["browser-blank"]; view == nil || len(view.urls) != 1 || view.urls[0] != "http://example.com" {
+		t.Fatalf("blank tab did not become a browser view: %+v", view)
+	}
+}
+
 func TestBrowserHotkeySanitizers(t *testing.T) {
 	if !validBrowserHotkeyAction("focusUrl") || !validBrowserHotkeyAction("tabAt") {
 		t.Fatal("expected browser hotkey actions rejected")
