@@ -12,7 +12,7 @@ func TestConcurrentSettingsPreserveIndependentFields(t *testing.T) {
 	start := make(chan struct{})
 	for _, run := range []func(){
 		func() {
-			r := performJSON(app.handleAppearance, http.MethodPost, "/api/settings/appearance", map[string]any{"fontSize": 18, "theme": "dark", "restoreTabs": true})
+			r := performJSON(app.handleAppearance, http.MethodPost, "/api/settings/appearance", map[string]any{"fontSize": 18, "terminalFont": "cascadia-mono", "theme": "dark", "restoreTabs": true})
 			if r.Code != 200 {
 				t.Errorf("appearance: %d %s", r.Code, r.Body.String())
 			}
@@ -33,7 +33,7 @@ func TestConcurrentSettingsPreserveIndependentFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.FontSize != 18 || !cfg.RestoreTabs || !cfg.SavePasswords {
+	if cfg.FontSize != 18 || cfg.TerminalFont != "cascadia-mono" || !cfg.RestoreTabs || !cfg.SavePasswords {
 		t.Fatalf("independent settings lost: %+v", cfg)
 	}
 }
