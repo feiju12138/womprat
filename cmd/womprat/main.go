@@ -32,14 +32,17 @@ var frontendFS embed.FS
 var useExitNode = false
 
 const (
-	appName            = "womprat"
-	tailscaleUpTimeout = 30 * time.Second
+	appName                = "womprat"
+	blankBrowserURL        = "about:blank"
+	tailscaleUpTimeout     = 30 * time.Second
+	tailscaleRetryInterval = 15 * time.Second
 )
 
 var (
-	version       = "0.3.0"
-	commit        = "dev"
-	tabIDSequence uint64
+	version               = "0.3.0"
+	commit                = "dev"
+	tabIDSequence         uint64
+	errNoTailscaleAuthKey = errors.New("no tailscale auth key")
 	// debugBuild is set via -ldflags "-X main.debugBuild=1" to force verbose
 	// logging (and WebView devtools) regardless of stored config. Empty in normal
 	// release builds, so default behavior is unchanged.
@@ -69,6 +72,10 @@ type Tab struct {
 	Port    int    `json:"port,omitempty"`
 }
 
+func isBlankBrowserTab(tab Tab) bool {
+	return tab.Type == "browser" && tab.URL == blankBrowserURL
+}
+
 type shellWebView interface {
 	Navigate(string)
 	Eval(string)
@@ -95,9 +102,14 @@ type browserContentManager interface {
 
 type App struct {
 	configSaveMu sync.Mutex // acquire before mu for snapshot/save/commit
+	tsStartMu    sync.Mutex // serialize tsnet startup and replacement
+	tsRetryMu    sync.Mutex
+	tsRetrying   bool
+	tsRetryStop  chan struct{}
 	mu           sync.Mutex
 	config       *AppConfig
 	tsServer     *tsnet.Server
+	tsLastError  string
 	tabs         []Tab
 	activeTab    string
 	sshConns     map[string]*ssh.Client
@@ -168,6 +180,7 @@ func main() {
 	if !app.locked {
 		if err := app.startTailscale(); err != nil {
 			log.Printf("Tailscale start failed: %v (will prompt for key)", err)
+			app.scheduleTailscaleRetry()
 		}
 	}
 
@@ -342,7 +355,7 @@ func (a *App) persistOpenTabs() {
 	a.mu.Lock()
 	saved := make([]SavedTab, 0, len(a.tabs))
 	for _, t := range a.tabs {
-		if t.Type == "settings" {
+		if t.Type == "settings" || isBlankBrowserTab(t) {
 			continue
 		}
 		saved = append(saved, SavedTab{Type: t.Type, Title: t.Title, Host: t.Host, User: t.User, Port: t.Port, URL: t.URL, Favicon: t.Favicon})
@@ -381,6 +394,11 @@ func (a *App) switchTab(tabID string) {
 
 	switch tab.Type {
 	case "browser":
+		if isBlankBrowserTab(*tab) {
+			a.showFullShellOnUI()
+			a.evalShell("window.activateTab(%s,{skipNative:true})", jsString(tabID))
+			return
+		}
 		a.evalShell("window.activateTab(%s,{skipNative:true})", jsString(tabID))
 		if a.contentViews != nil {
 			url := tab.URL
@@ -676,6 +694,8 @@ func (a *App) registerLocalTab(tabJSON string) {
 	}
 	if tab.Type == "settings" {
 		tab = Tab{ID: "settings", Type: "settings", Title: "Settings", URL: "settings:"}
+	} else if tab.Type == "browser" && strings.EqualFold(strings.TrimSpace(tab.URL), blankBrowserURL) {
+		tab = Tab{ID: tab.ID, Type: "browser", Title: "New tab", URL: blankBrowserURL}
 	} else {
 		a.mu.Lock()
 		for _, existing := range a.tabs {
@@ -759,9 +779,13 @@ func (a *App) goHome() {
 }
 
 func (a *App) startTailscale() error {
+	a.tsStartMu.Lock()
+	defer a.tsStartMu.Unlock()
+
 	authKey, err := GetCredential("tailscale-key")
 	if err != nil || authKey == "" {
-		return fmt.Errorf("no tailscale auth key")
+		a.setTailscaleError(errNoTailscaleAuthKey)
+		return errNoTailscaleAuthKey
 	}
 
 	ts := &tsnet.Server{
@@ -774,12 +798,14 @@ func (a *App) startTailscale() error {
 	defer cancelUp()
 	if _, err := ts.Up(upCtx); err != nil {
 		ts.Close()
+		a.setTailscaleError(err)
 		return err
 	}
 
 	a.mu.Lock()
 	old := a.tsServer
 	a.tsServer = ts
+	a.tsLastError = ""
 	a.mu.Unlock()
 	if old != nil {
 		old.Close()
@@ -790,7 +816,9 @@ func (a *App) startTailscale() error {
 	// explicitly each run makes routing deterministic (rather than depending on
 	// whatever tailscaled.state happened to carry) and surfaces, in the log,
 	// exactly what public-internet routing is in effect.
+	a.mu.Lock()
 	exitNode := a.config.ExitNode
+	a.mu.Unlock()
 	if exitNode != "" {
 		applyCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		err := a.applyExitNodePreference(applyCtx, exitNode)
@@ -805,6 +833,67 @@ func (a *App) startTailscale() error {
 	}
 	a.logTSNetRouting()
 	return nil
+}
+
+func (a *App) scheduleTailscaleRetry() {
+	a.tsRetryMu.Lock()
+	if a.tsRetrying {
+		a.tsRetryMu.Unlock()
+		return
+	}
+	stop := make(chan struct{})
+	a.tsRetryStop = stop
+	a.tsRetrying = true
+	a.tsRetryMu.Unlock()
+
+	go func() {
+		defer func() {
+			a.tsRetryMu.Lock()
+			a.tsRetrying = false
+			a.tsRetryStop = nil
+			a.tsRetryMu.Unlock()
+		}()
+		for attempt := 1; ; attempt++ {
+			if a.ts() != nil {
+				return
+			}
+			if err := a.startTailscale(); err == nil {
+				log.Printf("Tailscale retry connected on attempt %d", attempt)
+				return
+			} else if errors.Is(err, errNoTailscaleAuthKey) {
+				return
+			} else {
+				log.Printf("Tailscale retry %d failed: %v", attempt, err)
+			}
+			timer := time.NewTimer(tailscaleRetryInterval)
+			select {
+			case <-timer.C:
+			case <-stop:
+				timer.Stop()
+				return
+			}
+		}
+	}()
+}
+
+func (a *App) setTailscaleError(err error) {
+	a.mu.Lock()
+	if err == nil {
+		a.tsLastError = ""
+	} else {
+		a.tsLastError = err.Error()
+	}
+	a.mu.Unlock()
+}
+
+func (a *App) stopTailscaleRetry() {
+	a.tsRetryMu.Lock()
+	stop := a.tsRetryStop
+	a.tsRetryStop = nil
+	a.tsRetryMu.Unlock()
+	if stop != nil {
+		close(stop)
+	}
 }
 
 // logTSNetRouting records the effective tsnet routing preferences so the log
@@ -989,6 +1078,7 @@ func (a *App) handleUnlock(w http.ResponseWriter, r *http.Request) {
 	a.locked = false
 	a.mu.Unlock()
 	if err := a.startTailscale(); err != nil {
+		a.scheduleTailscaleRetry()
 		writeJSON(w, http.StatusOK, map[string]string{"status": "unlocked", "tailscale": err.Error()})
 		return
 	}
@@ -1015,6 +1105,7 @@ func (a *App) handleSaveKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.startTailscale(); err != nil {
+		a.scheduleTailscaleRetry()
 		writeJSON(w, http.StatusOK, map[string]string{"status": "saved", "error": err.Error()})
 		return
 	}
@@ -1025,9 +1116,15 @@ func (a *App) handleTSStatus(w http.ResponseWriter, r *http.Request) {
 	if !requireGET(w, r) {
 		return
 	}
-	ts := a.ts()
+	a.mu.Lock()
+	ts := a.tsServer
+	lastError := a.tsLastError
+	a.mu.Unlock()
 	if ts == nil {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "disconnected"})
+		a.tsRetryMu.Lock()
+		retrying := a.tsRetrying
+		a.tsRetryMu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]interface{}{"status": "disconnected", "error": lastError, "retrying": retrying})
 		return
 	}
 	lc, err := ts.LocalClient()
