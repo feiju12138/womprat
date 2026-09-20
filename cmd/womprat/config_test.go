@@ -72,9 +72,9 @@ func TestCloneConfigCopiesMutableFields(t *testing.T) {
 }
 
 func TestNormalizeConfigRepairsInvalidDefaults(t *testing.T) {
-	cfg := &AppConfig{UnlockMethod: "bad", WindowWidth: -1, WindowHeight: 0, FontSize: 999}
+	cfg := &AppConfig{UnlockMethod: "bad", WindowWidth: -1, WindowHeight: 0, FontSize: 999, TerminalFont: "unknown"}
 	normalizeConfig(cfg)
-	if cfg.UnlockMethod != "dpapi" || cfg.WindowWidth != 1200 || cfg.WindowHeight != 800 || cfg.FontSize != 0 || cfg.Theme != "dark" || cfg.Hosts == nil {
+	if cfg.UnlockMethod != "dpapi" || cfg.WindowWidth != 1200 || cfg.WindowHeight != 800 || cfg.FontSize != 0 || cfg.TerminalFont != defaultTerminalFont || cfg.Theme != "dark" || cfg.Hosts == nil {
 		t.Fatalf("normalized config = %+v", cfg)
 	}
 }
@@ -87,6 +87,17 @@ func TestNormalizeAppearance(t *testing.T) {
 	}
 	if got := normalizeTheme("light"); got != "dark" {
 		t.Fatalf("normalizeTheme = %q", got)
+	}
+	for _, tt := range []struct{ in, want string }{
+		{"", defaultTerminalFont},
+		{" CASCADIA-MONO ", "cascadia-mono"},
+		{"consolas", "consolas"},
+		{"nsimsun", "nsimsun"},
+		{"custom-font", defaultTerminalFont},
+	} {
+		if got := normalizeTerminalFont(tt.in); got != tt.want {
+			t.Fatalf("normalizeTerminalFont(%q) = %q, want %q", tt.in, got, tt.want)
+		}
 	}
 }
 
