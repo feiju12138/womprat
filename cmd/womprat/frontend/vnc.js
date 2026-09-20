@@ -2955,6 +2955,8 @@ class WompratVncViewer {
   async reconnect() {
     if (this.disposed) return;
     this.closedByReconnect = true;
+    delete this.root.dataset.vncAuthRequired;
+    delete this.root.dataset.connected;
     this.releaseActiveKeys();
     try { this.ws?.close(1000, "reconnect"); } catch (error) { reportVncNonFatalError("reconnect close", error); }
     this.ws = null;
@@ -2977,6 +2979,8 @@ class WompratVncViewer {
     this.ws = null;
     this.framebuffer = null;
     this.canvas.style.cursor = "default";
+    delete this.root.dataset.vncAuthRequired;
+    delete this.root.dataset.connected;
   }
   connect() {
     const url = new URL(`${wsBase()}//${window.location.host}/api/vnc/ws`);
@@ -2984,6 +2988,7 @@ class WompratVncViewer {
     const token = (typeof window !== "undefined" && window.__SESSION_TOKEN) || "";
     if (token) url.searchParams.set("token", token);
     setBusy(this.root, true);
+    delete this.root.dataset.connected;
     setStatus(this.root, `Connecting to ${this.target}…`);
     this.ws = new WebSocket(url.toString());
     this.ws.binaryType = "arraybuffer";
@@ -2992,7 +2997,8 @@ class WompratVncViewer {
     this.ws.onclose = (event) => {
       setBusy(this.root, false);
       this.setSessionControlsEnabled(false);
-      if (!this.closedByReconnect)
+      delete this.root.dataset.connected;
+      if (!this.closedByReconnect && !this.root.hasAttribute("data-vnc-auth-required"))
         setStatus(this.root, event.reason ? `Disconnected: ${event.reason}` : "Disconnected.");
     };
     this.ws.onmessage = (event) => this.receive(new Uint8Array(event.data));
@@ -3014,6 +3020,7 @@ class WompratVncViewer {
       const message = String(error?.message || error);
       setStatus(this.root, `VNC error: ${message}`);
       if (/password authentication is required|authentication failed/i.test(message)) {
+        this.root.dataset.vncAuthRequired = "1";
         const input = this.root.querySelector("[data-vnc-password]");
         input?.focus?.();
       }
@@ -3039,6 +3046,8 @@ class WompratVncViewer {
         this.resizeFramebuffer(event.width, event.height);
         setBusy(this.root, false);
         this.setSessionControlsEnabled(true);
+        delete this.root.dataset.vncAuthRequired;
+        this.root.dataset.connected = "1";
         setStatus(this.root, `${event.name || this.target} · ${event.width}×${event.height}`);
         break;
       case "framebuffer-update":
@@ -3180,6 +3189,8 @@ class WompratVncViewer {
   installControls() {
     const reconnect = this.root.querySelector("[data-vnc-reconnect]");
     reconnect?.addEventListener("click", () => this.reconnect());
+    const connect = this.root.querySelector("[data-vnc-connect]");
+    connect?.addEventListener("click", () => this.reconnect());
     const password = this.root.querySelector("[data-vnc-password]");
     password?.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
