@@ -15,6 +15,8 @@ import (
 	"strings"
 )
 
+const defaultTerminalFont = "fira-code"
+
 // AppConfig holds all non-secret settings (DPAPI-encrypted on disk)
 type AppConfig struct {
 	// Unlock method: "master" (password) or "dpapi" (transparent)
@@ -40,10 +42,11 @@ type AppConfig struct {
 	ExitNode string `json:"exitNode"` // tailnet peer to use as exit node (empty = direct)
 
 	// Appearance
-	FontSize    int    `json:"fontSize"`
-	Theme       string `json:"theme"`
-	RestoreTabs bool   `json:"restoreTabs"`
-	AutoConnect bool   `json:"autoConnect"`
+	FontSize     int    `json:"fontSize"`
+	TerminalFont string `json:"terminalFont"`
+	Theme        string `json:"theme"`
+	RestoreTabs  bool   `json:"restoreTabs"`
+	AutoConnect  bool   `json:"autoConnect"`
 
 	// Diagnostics
 	DebugLog bool `json:"debugLog"` // write runtime log file and enable WebView dev tooling
@@ -75,6 +78,7 @@ func defaultConfig() *AppConfig {
 		WindowWidth:  1200,
 		WindowHeight: 800,
 		Hosts:        make(map[string]HostConfig),
+		TerminalFont: defaultTerminalFont,
 	}
 }
 
@@ -181,6 +185,7 @@ func normalizeConfig(cfg *AppConfig) {
 		cfg.WindowHeight = 800
 	}
 	cfg.FontSize = normalizeFontSize(cfg.FontSize)
+	cfg.TerminalFont = normalizeTerminalFont(cfg.TerminalFont)
 	cfg.Theme = normalizeTheme(cfg.Theme)
 	cfg.Hosts = sanitizeHostConfigs(cfg.Hosts)
 	cfg.OpenTabs = sanitizeSavedTabs(cfg.OpenTabs)
@@ -191,6 +196,21 @@ func normalizeFontSize(size int) int {
 		return 0
 	}
 	return size
+}
+
+func normalizeTerminalFont(font string) string {
+	switch strings.ToLower(strings.TrimSpace(font)) {
+	case "fira-code":
+		return "fira-code"
+	case "cascadia-mono":
+		return "cascadia-mono"
+	case "consolas":
+		return "consolas"
+	case "nsimsun":
+		return "nsimsun"
+	default:
+		return defaultTerminalFont
+	}
 }
 
 func normalizeTheme(_ string) string {
