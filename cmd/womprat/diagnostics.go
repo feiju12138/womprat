@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -42,7 +43,18 @@ func (a *App) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
 	checks := []diagnosticCheck{
 		timedDiagnostic("Tailscale connectivity", a.diagnoseTailscale, 5*time.Second),
 		timedDiagnostic("SOCKS listener", diagnoseSOCKSListener, 2*time.Second),
-		timedDiagnostic("SOCKS DNS/connect to google.com", diagnoseSOCKSDomainConnect, 8*time.Second),
+	}
+	a.mu.Lock()
+	hasExitNode := strings.TrimSpace(a.config.ExitNode) != ""
+	a.mu.Unlock()
+	if hasExitNode {
+		checks = append(checks, timedDiagnostic("SOCKS DNS/connect to google.com", diagnoseSOCKSDomainConnect, 8*time.Second))
+	} else {
+		checks = append(checks, diagnosticCheck{
+			Name:   "SOCKS DNS/connect to google.com",
+			Status: "skip",
+			Detail: "no exit node configured; public internet is intentionally unavailable in tailnet-only mode",
+		})
 	}
 	writeJSON(w, http.StatusOK, diagnosticsResponse{GeneratedAt: time.Now(), Checks: checks})
 }
