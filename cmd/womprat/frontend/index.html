@@ -67,7 +67,8 @@ button,a,.tab,.recent-item,.option{
 .tab{display:flex;align-items:center;gap:6px;padding:0 6px 0 12px;height:32px;border-radius:var(--radius);
   cursor:pointer;color:var(--dim);font-weight:400;-webkit-app-region:no-drag;line-height:32px;font-size:14px;min-width:0;flex:0 1 220px;max-width:240px}
 .tab.dragging{opacity:.45}
-.tab.drag-over{background:var(--subtle-hover);border:1px solid var(--border-strong)}
+.tab.drop-before{box-shadow:inset 2px 0 var(--accent)}
+.tab.drop-after{box-shadow:inset -2px 0 var(--accent)}
 .tab:hover{background:var(--subtle-hover);color:var(--text)}
 .tab.active{background:var(--layer);color:var(--text);font-weight:600}
 .tab-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}
@@ -111,11 +112,11 @@ button,a,.tab,.recent-item,.option{
 .rdp-panel{position:relative;flex:1;display:grid;grid-template-rows:minmax(0,1fr);min-height:0;overflow:hidden;isolation:isolate;background:#050609;color:var(--text)}
 .vnc-toolbar{display:none!important}
 .vnc-status,.rdp-status{display:inline-flex;align-items:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:none;opacity:1}.vnc-status{gap:8px;color:var(--text)}.vnc-status::before{content:"";width:8px;height:8px;flex:0 0 8px;border-radius:999px;background:var(--accent);box-shadow:none}.vnc-panel[data-busy] .vnc-status::before{animation:vncPulse 1.2s ease-in-out infinite;background:#f2c94c}
-.rdp-statusbar{position:absolute;z-index:4;left:0;bottom:0;width:max-content;max-width:calc(100% - 2rem);height:2.5em;background:var(--surface-solid);border:1px solid var(--border);border-left:0;border-bottom:0;display:inline-flex;align-items:center;padding:0 1rem;gap:.8rem;font-size:.82em;pointer-events:none}.rdp-status{max-width:100%;font-weight:600;color:var(--text)}.rdp-status::before{content:none!important}
-.rdp-dialog{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:10px;width:min(360px,calc(100% - 32px));padding:16px;border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:#2d2d2d;box-shadow:0 24px 72px rgba(0,0,0,.55)}.rdp-dialog-title{font-weight:700;color:var(--text);font-size:14px}.rdp-dialog-actions{display:flex;gap:8px;justify-content:flex-end}.rdp-panel[data-connecting] .rdp-dialog,.rdp-panel[data-connected] .rdp-dialog{display:none}
+.vnc-statusbar,.rdp-statusbar{position:absolute;z-index:4;left:0;bottom:0;width:max-content;max-width:calc(100% - 2rem);height:2.5em;background:var(--surface-solid);border:1px solid var(--border);border-left:0;border-bottom:0;display:inline-flex;align-items:center;padding:0 1rem;gap:.8rem;font-size:.82em;pointer-events:none}.vnc-statusbar .vnc-status,.rdp-status{max-width:100%;font-weight:600;color:var(--text)}.rdp-status::before{content:none!important}.vnc-panel[data-connected] .vnc-statusbar{display:none}
+.vnc-dialog,.rdp-dialog{position:absolute;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);flex-direction:column;gap:10px;width:min(360px,calc(100% - 32px));padding:16px;border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:#2d2d2d;box-shadow:0 24px 72px rgba(0,0,0,.55)}.vnc-dialog{display:none}.vnc-panel[data-vnc-auth-required] .vnc-dialog{display:flex}.rdp-dialog{display:flex}.vnc-dialog-title,.rdp-dialog-title{font-weight:700;color:var(--text);font-size:14px}.vnc-dialog-message{color:var(--text-secondary);font-size:13px}.vnc-dialog-actions,.rdp-dialog-actions{display:flex;gap:8px;justify-content:flex-end}.rdp-panel[data-connecting] .rdp-dialog,.rdp-panel[data-connected] .rdp-dialog{display:none}
 .rdp-config{display:none!important}.rdp-caps{display:none!important}
 .vnc-field,.rdp-field{height:24px;background:var(--layer);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:0 8px;font:12px var(--font);outline:none;color-scheme:dark}.vnc-field:focus,.rdp-field:focus{border-color:var(--accent);background:var(--bg)}
-.vnc-password{margin-left:auto;width:128px}.vnc-clipboard{min-width:160px;max-width:360px;width:28vw}.vnc-send,.vnc-copy,.vnc-paste,.vnc-reconnect,.vnc-scale,.rdp-connect,.rdp-scale{height:24px;min-width:52px;padding:0 10px;font-size:12px;font-weight:600}.rdp-user,.rdp-password{width:100%;height:30px}.rdp-depth{width:74px}.rdp-toggle{display:inline-flex;align-items:center;gap:4px;height:24px;color:var(--text-secondary);white-space:nowrap}.rdp-toggle input{accent-color:var(--accent)}
+.vnc-password{width:100%;height:30px}.vnc-clipboard{min-width:160px;max-width:360px;width:28vw}.vnc-send,.vnc-copy,.vnc-paste,.vnc-connect,.vnc-reconnect,.vnc-scale,.rdp-connect,.rdp-scale{height:24px;min-width:52px;padding:0 10px;font-size:12px;font-weight:600}.rdp-user,.rdp-password{width:100%;height:30px}.rdp-depth{width:74px}.rdp-toggle{display:inline-flex;align-items:center;gap:4px;height:24px;color:var(--text-secondary);white-space:nowrap}.rdp-toggle input{accent-color:var(--accent)}
 .vnc-viewport,.rdp-viewport{position:relative;z-index:1;min-height:0;min-width:0;display:grid;place-items:center;overflow:hidden;contain:layout paint;background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.06),transparent 42%),#050609}.rdp-viewport{display:none}.rdp-panel[data-connecting] .rdp-viewport,.rdp-panel[data-connected] .rdp-viewport{display:grid}
 .vnc-viewport canvas,.rdp-viewport canvas{display:block;box-sizing:border-box;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;image-rendering:auto;background:#000;border:0!important;border-radius:0!important;box-shadow:none!important;outline:0!important}
 .rdp-viewport canvas{object-fit:fill}
@@ -326,7 +327,15 @@ function applyStaticIcons(root = document) {
 const state = { tabs: [], activeTab: null };
 const terminalSessions = new Map();
 const failedFavicons = new Set();
-const TERMINAL_FONT_SIZE = 14;
+const DEFAULT_TERMINAL_FONT_SIZE = 14;
+const DEFAULT_TERMINAL_FONT = 'fira-code';
+const TERMINAL_FONT_FAMILIES = Object.freeze({
+  'fira-code': "'FiraCode Nerd Font Mono', 'NSimSun', 'Microsoft YaHei UI', monospace",
+  'cascadia-mono': "'Cascadia Mono', 'NSimSun', 'Microsoft YaHei UI', monospace",
+  'consolas': "Consolas, 'NSimSun', 'Microsoft YaHei UI', monospace",
+  'nsimsun': "'NSimSun', 'SimSun', monospace",
+});
+let terminalAppearance = { fontSize: DEFAULT_TERMINAL_FONT_SIZE, terminalFont: DEFAULT_TERMINAL_FONT };
 const MIN_TERMINAL_COLS = 20;
 const MAX_TERMINAL_COLS = 500;
 const MIN_TERMINAL_ROWS = 5;
@@ -334,6 +343,36 @@ const MAX_TERMINAL_ROWS = 200;
 const MAX_BROWSER_TITLE_RUNES = 200;
 const MAX_FAVICON_URL_BYTES = 2048;
 const MAX_SSH_PASSWORD_CHARS = 4096;
+function normalizeTerminalFont(font) {
+  const key = String(font || '').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(TERMINAL_FONT_FAMILIES, key) ? key : DEFAULT_TERMINAL_FONT;
+}
+function normalizeTerminalFontSize(size) {
+  const value = Math.round(Number(size));
+  return value >= 10 && value <= 32 ? value : DEFAULT_TERMINAL_FONT_SIZE;
+}
+function applyTerminalAppearance(appearance = {}) {
+  terminalAppearance = {
+    fontSize: normalizeTerminalFontSize(appearance.fontSize),
+    terminalFont: normalizeTerminalFont(appearance.terminalFont),
+  };
+  const fontFamily = TERMINAL_FONT_FAMILIES[terminalAppearance.terminalFont];
+  terminalSessions.forEach(session => {
+    session.fontSize = terminalAppearance.fontSize;
+    session.term.options.fontSize = terminalAppearance.fontSize;
+    session.term.options.fontFamily = fontFamily;
+    requestAnimationFrame(() => session.fit?.fit?.());
+  });
+}
+async function loadTerminalAppearance() {
+  try {
+    const res = await fetch('/api/settings/config');
+    if (!res.ok) throw new Error(await res.text());
+    applyTerminalAppearance(await res.json());
+  } catch (err) {
+    console.warn('terminal appearance load failed', err);
+  }
+}
 function readShellContentZoom() {
   try { return Number(sessionStorage.getItem('wompratShellContentZoom') || '1') || 1; }
   catch (err) { console.warn('shell zoom storage unavailable', err); return 1; }
@@ -393,9 +432,10 @@ function setURLProgress(active, _done = false) {
 const loadingTabs = new Set();
 let navAvailability = { tabId: null, back: false, forward: false };
 function activeTabObj() { return state.tabs.find(t => t.id === state.activeTab); }
+function isBlankBrowserTab(tab) { return tab?.type === 'browser' && tab.url === 'about:blank'; }
 function updateNavButtonsUI() {
   const t = activeTabObj();
-  const browser = !!t && t.type === 'browser';
+  const browser = !!t && t.type === 'browser' && !isBlankBrowserTab(t);
   const sameTab = navAvailability.tabId === state.activeTab;
   const back = document.getElementById('nav-back');
   const fwd = document.getElementById('nav-forward');
@@ -493,13 +533,14 @@ window.wompratSetTabTitle = function(tabId, title) {
 window.wompratSetTabMeta = function(tabId, title, favicon) {
   const tab = state.tabs.find(t => t.id === tabId);
   if (!tab) return;
-  let changed = false;
+  let titleChanged = false;
+  let faviconChanged = false;
   const cleanTitle = sanitizeBrowserTitle(title);
   const cleanFavicon = sanitizeFaviconURL(favicon);
-  if (cleanTitle && tab.title !== cleanTitle) { tab.title = cleanTitle; changed = true; }
-  if (cleanFavicon && tab.favicon !== cleanFavicon) { tab.favicon = cleanFavicon; changed = true; }
-  if (!changed) return;
-  renderTabs();
+  if (cleanTitle && tab.title !== cleanTitle) { tab.title = cleanTitle; titleChanged = true; }
+  if (cleanFavicon && tab.favicon !== cleanFavicon) { tab.favicon = cleanFavicon; faviconChanged = true; }
+  if (!titleChanged && !faviconChanged) return;
+  if (!updateRenderedTab(tab, faviconChanged)) renderTabs();
   registerLocalTab(tab);
   saveOpenTabs();
 };
@@ -609,23 +650,25 @@ function normalizedCustomURL(target) {
 function newLocalTabID(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
 }
-function openCustomViewerFallback(target) {
+function openCustomViewerFallback(target, options = {}) {
   const url = normalizedCustomURL(target);
-  const id = newLocalTabID(target.scheme);
+  const id = validTabID(options.id) ? options.id : newLocalTabID(target.scheme);
   const tab = { id, type: target.scheme, title: url, url, host: target.host, user: target.user || '', port: target.port };
-  state.tabs.push(tab);
+  const existingIndex = state.tabs.findIndex(t => t.id === id);
+  if (existingIndex >= 0) state.tabs[existingIndex] = tab;
+  else state.tabs.push(tab);
   saveURLHistory(url);
   activateTab(id, { skipNative: true });
   registerLocalTab(tab);
   saveOpenTabs();
 }
-function callNativeCustomViewer(target, text) {
+function callNativeCustomViewer(target, text, options = {}) {
   // VNC/RDP panels are rendered and connected entirely by the shell (vnc.js /
   // rdp.js connect to /api/{vnc,rdp}/ws through tsnet). The local viewer path
   // creates the tab in shell state and starts the panel; the native Go binding
   // only created a server-side tab and could not render here, so use the local
   // path directly.
-  openCustomViewerFallback(target);
+  openCustomViewerFallback(target, options);
   return true;
 }
 function coerceCustomScheme(text) {
@@ -639,7 +682,12 @@ function isCustomSchemeURL(text) {
 function openSpecialURL(url) {
   const text = coerceCustomScheme(url);
   if (!text) return false;
-  if (/^settings:?$/i.test(text)) { openSettings(); return true; }
+  const replaceTabId = isBlankBrowserTab(activeTabObj()) ? state.activeTab : '';
+  if (/^settings:?$/i.test(text)) {
+    if (replaceTabId) closeTab(replaceTabId);
+    openSettings();
+    return true;
+  }
   const target = parseCustomURL(text);
   if (!target) {
     // A custom-scheme URL that failed strict parsing must not silently become an
@@ -653,10 +701,10 @@ function openSpecialURL(url) {
   if (target.scheme === 'ssh') {
     const user = target.user || 'root';
     saveURLHistory(formatSSHURL(user, target.host, target.port));
-    openTerminal(target.host, target.host, user, target.port);
+    openTerminal(target.host, target.host, user, target.port, { id: replaceTabId, skipNative: !!replaceTabId });
     return true;
   }
-  if (target.scheme === 'vnc' || target.scheme === 'rdp') return callNativeCustomViewer(target, text);
+  if (target.scheme === 'vnc' || target.scheme === 'rdp') return callNativeCustomViewer(target, text, { id: replaceTabId });
   return false;
 }
 function saveURLHistory(url) {
@@ -817,15 +865,13 @@ window.saveKey = async function() {
 };
 
 window.newBlankTab = function() {
-  state.activeTab = null;
+  const tab = { id: newLocalTabID('browser'), type: 'browser', title: 'New tab', url: 'about:blank' };
+  state.tabs.push(tab);
   clearNavStatus();
   if (window.womprat_clearActiveTab) window.womprat_clearActiveTab();
-  document.getElementById('panels')?.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  updateHomeVisibility();
-  renderTabs();
+  activateTab(tab.id, { skipNative: true });
+  saveOpenTabs();
   refreshURLHistoryDatalist();
-  updateURLMode(null);
-  updateNavButtonsUI();
   const input = document.getElementById('url-input');
   if (input) {
     input.value = '';
@@ -842,7 +888,7 @@ window.openTerminal = async function(host, name, user, port, options = {}) {
   if (existingIndex >= 0) state.tabs[existingIndex] = tab;
   else state.tabs.push(tab);
   renderTabs();
-  activateTab(tabId);
+  activateTab(tabId, { skipNative: !!options.skipNative });
   if (!options.skipRegister) registerLocalTab(tab);
   saveOpenTabs(); updateHomeVisibility();
 
@@ -859,8 +905,8 @@ window.openTerminal = async function(host, name, user, port, options = {}) {
   const container = panel.querySelector('.term-container');
 
   // Create terminal immediately with "Connecting..." message
-  const term = new Terminal({ allowProposedApi: true, cursorBlink: true, fontSize: TERMINAL_FONT_SIZE, bellStyle: 'sound', copyOnSelect: true, rightClickSelectsWord: true, scrollback: 10000, overviewRuler: { width: 2 },
-    fontFamily: 'FiraCode Nerd Font Mono, monospace',
+  const term = new Terminal({ allowProposedApi: true, cursorBlink: true, fontSize: terminalAppearance.fontSize, bellStyle: 'sound', copyOnSelect: true, rightClickSelectsWord: true, scrollback: 10000, overviewRuler: { width: 2 },
+    fontFamily: TERMINAL_FONT_FAMILIES[terminalAppearance.terminalFont],
     fontWeight: '400', fontWeightBold: '700',
     theme: { background: '#202020', foreground: '#fff', cursor: '#60cdff',
              selectionBackground: 'rgba(96,205,255,.3)' }
@@ -876,6 +922,13 @@ window.openTerminal = async function(host, name, user, port, options = {}) {
   term.unicode.activeVersion = '11';
     term.attachCustomKeyEventHandler((ev) => {
       const key = ev.key.toLowerCase();
+      if (ev.type === 'keydown' && ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey && key === 'c') {
+        ev.preventDefault?.();
+        ev.stopPropagation?.();
+        ev.stopImmediatePropagation?.();
+        term.input('\x03', true);
+        return false;
+      }
       if (ev.ctrlKey && ev.shiftKey && !ev.altKey && key === 'w') {
         ev.preventDefault?.();
         ev.stopPropagation?.();
@@ -889,16 +942,17 @@ window.openTerminal = async function(host, name, user, port, options = {}) {
     // Update tab title from terminal title sequences
     term.onTitleChange((title) => {
       const t = state.tabs.find(t => t.id === tabId);
-      if (t && title) {
-        t.title = Array.from(sanitizeBrowserTitle(title)).slice(0, 48).join('');
-        renderTabs();
+      const clean = Array.from(sanitizeBrowserTitle(title)).slice(0, 48).join('');
+      if (t && clean && t.title !== clean) {
+        t.title = clean;
+        if (!updateRenderedTab(t)) renderTabs();
         registerLocalTab(t);
         saveOpenTabs();
       }
     });
   term.open(container);
   fit.fit();
-  terminalSessions.set(tabId, { term, fit, fontSize: TERMINAL_FONT_SIZE, ws: null });
+  terminalSessions.set(tabId, { term, fit, fontSize: terminalAppearance.fontSize, ws: null });
   window.addEventListener('resize', () => { if (state.activeTab === tabId) fit.fit(); });
   // Fade the scrollbar on idle: reveal on scroll/output (and hover via CSS),
   // hide after a short idle delay.
@@ -1181,6 +1235,16 @@ function tabIconElement(tab) {
   return slot;
 }
 
+function updateRenderedTab(tab, refreshIcon = false) {
+  if (!tab || !validTabID(tab.id)) return false;
+  const el = document.querySelector(`#tab-list .tab[data-tab-id="${CSS.escape(tab.id)}"]`);
+  if (!el) return false;
+  const title = el.querySelector('.tab-title');
+  if (title && title.textContent !== (tab.title || '')) title.textContent = tab.title || '';
+  if (refreshIcon) el.querySelector('.tab-icon-slot')?.replaceWith(tabIconElement(tab));
+  return true;
+}
+
 function renderTabs() {
   const list = document.getElementById('tab-list');
   if (!list) return;
@@ -1201,15 +1265,27 @@ function renderTabs() {
     });
     el.addEventListener('dragend', () => {
       el.classList.remove('dragging');
-      document.querySelectorAll('.tab.drag-over').forEach(t => t.classList.remove('drag-over'));
+      clearTabDropIndicators();
     });
-    el.addEventListener('dragover', (e) => { e.preventDefault(); el.classList.add('drag-over'); e.dataTransfer.dropEffect = 'move'; });
-    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      clearTabDropIndicators();
+      const rect = el.getBoundingClientRect();
+      el.classList.add(e.clientX >= rect.left + rect.width / 2 ? 'drop-after' : 'drop-before');
+      e.dataTransfer.dropEffect = 'move';
+    });
+    el.addEventListener('dragleave', (e) => {
+      if (!el.contains(e.relatedTarget)) clearTabDropIndicators();
+    });
     el.addEventListener('drop', (e) => {
       e.preventDefault();
-      el.classList.remove('drag-over');
+      e.stopPropagation();
       const fromId = e.dataTransfer.getData('text/plain');
-      reorderTab(fromId, tab.id);
+      const rect = el.getBoundingClientRect();
+      const afterTarget = e.clientX >= rect.left + rect.width / 2;
+      clearTabDropIndicators();
+      if (fromId === tab.id) return;
+      reorderTab(fromId, tabDropBeforeID(fromId, tab.id, afterTarget));
     });
     el.appendChild(tabIconElement(tab));
     const title = document.createElement('span');
@@ -1234,14 +1310,24 @@ function renderTabs() {
   });
 }
 
+function clearTabDropIndicators() {
+  document.querySelectorAll('.tab.drop-before, .tab.drop-after').forEach(tab => tab.classList.remove('drop-before', 'drop-after'));
+}
+
+function tabDropBeforeID(fromId, targetId, afterTarget) {
+  if (!afterTarget) return targetId;
+  const remaining = state.tabs.filter(tab => tab.id !== fromId);
+  const targetIndex = remaining.findIndex(tab => tab.id === targetId);
+  return targetIndex >= 0 ? (remaining[targetIndex + 1]?.id || '') : '';
+}
+
 function reorderTab(fromId, beforeId) {
-  if (!validTabID(fromId) || !validTabID(beforeId) || fromId === beforeId) return;
+  if (!validTabID(fromId) || (beforeId && !validTabID(beforeId)) || fromId === beforeId) return;
   const fromIndex = state.tabs.findIndex(t => t.id === fromId);
-  const beforeIndex = state.tabs.findIndex(t => t.id === beforeId);
-  if (fromIndex < 0 || beforeIndex < 0) return;
+  if (fromIndex < 0) return;
   const [tab] = state.tabs.splice(fromIndex, 1);
-  let insertAt = beforeIndex;
-  if (fromIndex < beforeIndex) insertAt--;
+  let insertAt = beforeId ? state.tabs.findIndex(t => t.id === beforeId) : state.tabs.length;
+  if (insertAt < 0) insertAt = state.tabs.length;
   state.tabs.splice(insertAt, 0, tab);
   renderTabs();
   saveOpenTabs();
@@ -1255,7 +1341,7 @@ function updateRemoteTabTitle(tabId, title) {
   const clean = sanitizeBrowserTitle(title);
   if (!tab || !clean || tab.title === clean) return;
   tab.title = clean;
-  renderTabs();
+  if (!updateRenderedTab(tab)) renderTabs();
   registerLocalTab(tab);
   saveOpenTabs();
 }
@@ -1318,13 +1404,24 @@ function activateTab(id, options = {}) {
   // Update URL bar with active tab's address
   const urlInput = document.getElementById('url-input');
   if (urlInput) {
-    if (tab.type === 'browser' || tab.type === 'vnc' || tab.type === 'rdp') urlInput.value = tab.url || '';
+    if (isBlankBrowserTab(tab)) urlInput.value = '';
+    else if (tab.type === 'browser' || tab.type === 'vnc' || tab.type === 'rdp') urlInput.value = tab.url || '';
     else if (tab.type === 'terminal') urlInput.value = 'ssh://' + (tab.user||'root') + '@' + (tab.host||'') + ':' + (tab.port||22);
     else if (tab.type === 'settings') urlInput.value = 'settings:';
     else urlInput.value = '';
   }
 
   const panels = document.getElementById('panels');
+  if (isBlankBrowserTab(tab)) {
+    panels?.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    registerLocalTab(tab);
+    updateHomeVisibility();
+    renderTabs();
+    updateURLMode(null);
+    updateNavButtonsUI();
+    requestAnimationFrame(() => focusAddress(false));
+    return;
+  }
   // Create panel if it doesn't exist. Only local content is allowed here.
   if (!document.getElementById(`panel-${id}`)) {
     const panel = document.createElement('div');
@@ -1355,9 +1452,16 @@ function activateTab(id, options = {}) {
     } else if (tab.type === 'vnc') {
       panel.className = 'panel browser-panel';
       panel.innerHTML = `<div class="vnc-panel">
-        <div class="vnc-toolbar">
-          <span class="vnc-status" data-vnc-status>Preparing VNC…</span>
+        <div class="vnc-statusbar" aria-live="polite"><span class="vnc-status" data-vnc-status>Preparing VNC…</span></div>
+        <div class="vnc-dialog" role="dialog" aria-label="VNC authentication">
+          <div class="vnc-dialog-title">VNC password required</div>
+          <div class="vnc-dialog-message">Enter the password configured on the VNC server.</div>
           <input class="vnc-field vnc-password" data-vnc-password type="password" placeholder="Password" aria-label="VNC password" autocomplete="current-password" maxlength="8">
+          <div class="vnc-dialog-actions">
+            <button data-vnc-connect class="icon-button text-button vnc-connect">Connect</button>
+          </div>
+        </div>
+        <div class="vnc-toolbar">
           <button data-vnc-reconnect class="icon-button text-button vnc-reconnect">Reconnect</button>
           <button data-vnc-scale class="icon-button text-button vnc-scale" aria-pressed="true">Fit</button>
           <input class="vnc-field vnc-clipboard" data-vnc-clipboard placeholder="Clipboard text" aria-label="VNC clipboard text">
@@ -1499,8 +1603,8 @@ function focusContentArea() {
 function resetActiveContentZoom() {
   const session = terminalSessions.get(state.activeTab);
   if (session) {
-    session.fontSize = TERMINAL_FONT_SIZE;
-    session.term.options.fontSize = TERMINAL_FONT_SIZE;
+    session.fontSize = terminalAppearance.fontSize;
+    session.term.options.fontSize = terminalAppearance.fontSize;
     session.fit.fit();
     return;
   }
@@ -1677,12 +1781,11 @@ function activateRecentTab(tab) {
 }
 
 function recentTabKey(tab) {
-  const clean = sanitizeTabForSave(tab);
-  if (!clean) return '';
-  if (clean.type === 'terminal') return `terminal:${formatSSHURL(clean.user || 'root', clean.host || clean.title, clean.port || 22).toLowerCase()}`;
-  if (clean.type === 'browser') return `browser:${normalizeBrowserURL(clean.url).toLowerCase()}`;
-  if (clean.type === 'vnc' || clean.type === 'rdp') return `${clean.type}:${String(clean.url || '').toLowerCase()}`;
-  return `${clean.type}:${String(clean.url || clean.title || '').toLowerCase()}`;
+  if (!tab || isBlankBrowserTab(tab)) return '';
+  if (tab.type === 'terminal') return `terminal:${formatSSHURL(tab.user || 'root', tab.host || tab.title, tab.port || 22).toLowerCase()}`;
+  if (tab.type === 'browser') return `browser:${normalizeBrowserURL(tab.url).toLowerCase()}`;
+  if (tab.type === 'vnc' || tab.type === 'rdp') return `${tab.type}:${String(tab.url || '').toLowerCase()}`;
+  return `${tab.type}:${String(tab.url || tab.title || '').toLowerCase()}`;
 }
 function dedupeRecentTabs(tabs) {
   const seen = new Set;
@@ -1788,10 +1891,15 @@ async function hydrateNativeTabs() {
 
 // Save tabs on changes
 function sanitizeTabForSave(t) {
-  if (!t || t.id === 'settings' || !validTabID(t.id)) return null;
+  if (!t || t.id === 'settings') return null;
+  if (t.id != null && t.id !== '' && !validTabID(t.id)) return null;
   const type = String(t.type || '').toLowerCase();
   const base = { type, title: sanitizeBrowserTitle(t.title), host: String(t.host || ''), user: String(t.user || ''), port: Number(t.port || 0), url: String(t.url || ''), favicon: sanitizeFaviconURL(t.favicon) };
   if (type === 'browser') {
+    if (base.url === 'about:blank') {
+      base.title = 'New tab';
+      return base;
+    }
     const url = normalizeBrowserURL(base.url);
     if (!url) return null;
     base.url = url;
@@ -1823,7 +1931,7 @@ function saveOpenTabs() {
 function updateHomeVisibility() {
   const home = document.getElementById('panel-home');
   if (!home) return;
-  if (state.tabs.length === 0 || !state.activeTab) {
+  if (state.tabs.length === 0 || !state.activeTab || isBlankBrowserTab(activeTabObj())) {
     home.style.display = 'flex';
     home.classList.add('active');
   } else {
@@ -1907,6 +2015,10 @@ window.triggerDownload = async function(url) {
 // Listen for messages from internal iframes requesting shell actions.
 window.addEventListener('message', (e) => {
   if (e.origin !== window.location.origin) return;
+  if (e.data?.type === 'womprat-appearance') {
+    applyTerminalAppearance(e.data);
+    return;
+  }
   if (e.data?.type === 'download' && e.data.url) {
     triggerDownload(e.data.url);
     return;
@@ -1925,7 +2037,7 @@ wompratReportChrome();
 setTimeout(wompratReportChrome, 300);
 checkAuth();
 loadRecentTabs();
-hydrateNativeTabs();
+loadTerminalAppearance().then(hydrateNativeTabs);
 setInterval(() => updateNetworkIndicator(false), 1500);
 </script>
 
