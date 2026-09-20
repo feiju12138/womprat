@@ -89,7 +89,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .badge{display:inline-block;padding:.15rem .4rem;border-radius:4px;font-size:.7rem;font-weight:700}
 .badge-green{background:rgba(63,185,80,.15);color:var(--success)}
 .badge-dim{background:rgba(139,148,158,.12);color:var(--dim)}
-.diag-grid{display:grid;gap:8px;margin-top:10px}.diag-card{display:grid;grid-template-columns:minmax(160px,1fr) auto;gap:6px 12px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--layer)}.diag-name{font-weight:700}.diag-detail{grid-column:1 / -1;color:var(--dim);font-size:.8rem;overflow-wrap:anywhere}.diag-time{color:var(--dim);font-size:.75rem}.diag-status{justify-self:end}.diag-status.ok{color:var(--success)}.diag-status.error{color:var(--danger)}
+.diag-grid{display:grid;gap:8px;margin-top:10px}.diag-card{display:grid;grid-template-columns:minmax(160px,1fr) auto;gap:6px 12px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--layer)}.diag-name{font-weight:700}.diag-detail{grid-column:1 / -1;color:var(--dim);font-size:.8rem;overflow-wrap:anywhere}.diag-time{color:var(--dim);font-size:.75rem}.diag-status{justify-self:end}.diag-status.ok{color:var(--success)}.diag-status.error{color:var(--danger)}.diag-status.skip{color:var(--dim)}
 </style>
 </head>
 <body>
@@ -139,6 +139,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="section">
     <h3>Connection</h3>
     <div id="ts-status" class="status warn">Checking…</div>
+    <div id="ts-error" class="mono" style="color:var(--dim);font-size:.78rem;margin-top:.45rem;overflow-wrap:anywhere"></div>
     <table style="margin-top:.8rem">
       <tr><td style="color:var(--dim)">Hostname</td><td id="ts-hostname" class="mono">—</td></tr>
       <tr><td style="color:var(--dim)">Tailscale IP</td><td id="ts-ip" class="mono">—</td></tr>
@@ -184,7 +185,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div class="tab-panel" id="panel-hosts">
   <div class="section">
     <h3>Known Hosts</h3>
-    <p style="color:var(--dim);font-size:.82rem;margin-bottom:.6rem">Auto-discovered from your tailnet. Set the browser URL to use for each host.</p>
+    <p style="color:var(--dim);font-size:.82rem;margin-bottom:.6rem">Tailnet peers are discovered automatically. Manual hosts, URL overrides, and SSH host settings are stored only in Womprat's encrypted local configuration.</p>
     <table>
       <thead><tr><th>Host</th><th>URL</th><th>Status</th><th></th></tr></thead>
       <tbody id="hosts-table"><tr><td colspan="4" style="color:var(--dim)">Connect to Tailscale to discover peers</td></tr></tbody>
@@ -291,6 +292,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <div class="tab-panel" id="panel-appearance">
   <div class="section">
     <h3>Terminal</h3>
+    <label for="terminal-font">Font</label>
+    <select id="terminal-font">
+      <option value="fira-code" selected>FiraCode Nerd Font Mono</option>
+      <option value="cascadia-mono">Cascadia Mono</option>
+      <option value="consolas">Consolas</option>
+      <option value="nsimsun">NSimSun (CJK monospace)</option>
+    </select>
     <label for="font-size">Font Size</label>
     <input type="number" id="font-size" value="14" min="10" max="24" style="width:80px">
     <label for="theme">Color Scheme</label>
@@ -543,26 +551,34 @@ async function disconnectTailscale() {
   }
 }
 
+let tailscaleStatusTimer = 0;
 async function checkTailscale() {
+  clearTimeout(tailscaleStatusTimer);
+  tailscaleStatusTimer = 0;
   const el = document.getElementById('ts-status');
+  const error = document.getElementById('ts-error');
   try {
     const res = await fetch('/api/tailscale/status');
     const data = await res.json();
     if (data.status === 'connected') {
       el.className = 'status ok'; el.textContent = 'Connected';
+      if (error) error.textContent = '';
       document.getElementById('ts-hostname').textContent = data.hostname || '—';
       document.getElementById('ts-ip').textContent = (data.ip||[]).join(', ') || '—';
       const peers = await fetchJSON('/api/tailscale/peers', []);
       document.getElementById('ts-peers').textContent = peers.filter(p=>p.online).length + ' / ' + peers.length;
     } else {
-      el.className = 'status err'; el.textContent = 'Disconnected';
+      el.className = data.retrying ? 'status warn' : 'status err'; el.textContent = data.retrying ? 'Reconnecting…' : 'Disconnected';
+      if (error) error.textContent = data.error || '';
       document.getElementById('ts-hostname').textContent = '—';
       document.getElementById('ts-ip').textContent = '—';
       document.getElementById('ts-peers').textContent = '—';
+      if (data.retrying) tailscaleStatusTimer = setTimeout(checkTailscale, 2000);
     }
   } catch (err) {
     console.warn('tailscale status refresh failed', err);
     el.className='status err'; el.textContent = 'Error';
+    if (error) error.textContent = err.message;
   }
 }
 
@@ -761,6 +777,7 @@ async function refreshHosts() {
   if (!rows.length) { emptyTableRow(tbody, 4, 'No hosts'); return; }
   tbody.textContent = '';
   rows.forEach(p => {
+    const hasLocalConfig = Object.prototype.hasOwnProperty.call(hostConf, p.name);
     const conf = hostConf[p.name] || {};
     const fallbackURL = defaultHostURL(p);
     const url = conf.url || fallbackURL;
@@ -774,6 +791,10 @@ async function refreshHosts() {
     const actions = document.createElement('td');
     const open = document.createElement('button'); open.className = 'btn-secondary'; open.style.cssText = 'padding:.2rem .5rem;font-size:.7rem'; open.textContent = 'Open'; open.onclick = () => openHostURL(input.value);
     actions.appendChild(open);
+    if (hasLocalConfig) {
+      const remove = document.createElement('button'); remove.className = 'btn-danger'; remove.style.cssText = 'padding:.2rem .5rem;font-size:.7rem;margin-left:.35rem'; remove.textContent = 'Remove'; remove.onclick = () => deleteHost(p.name || '');
+      actions.appendChild(remove);
+    }
     tr.append(name, urlCell, status, actions);
     tbody.appendChild(tr);
   });
@@ -818,15 +839,36 @@ async function addHost() {
   updateHost(host, 'url', url).then(ok => { if (ok) refreshHosts(); });
 }
 
+async function deleteHost(host) {
+  const safeHost = safeHostName(host);
+  if (!safeHost) { setStatus('hosts-status', 'error', 'Invalid host'); return; }
+  if (!await confirmDialog(`Remove all local settings for "${safeHost}", including SSH key association and pinned host key? This does not remove the device from Tailscale.`, {title: 'Remove local host'})) return;
+  try {
+    const res = await fetch('/api/settings/hosts/'+encodeURIComponent(safeHost), {method:'DELETE'});
+    if (!res.ok) { setStatus('hosts-status', 'error', await res.text()); return; }
+    setStatus('hosts-status', 'ok', 'Local host settings removed');
+    await refreshHosts();
+  } catch (err) {
+    setStatus('hosts-status', 'error', `Host removal failed: ${err.message}`);
+  }
+}
+
 async function saveAppearance() {
   try {
-    const res = await fetch('/api/settings/appearance', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+    const appearance = {
+      terminalFont: document.getElementById('terminal-font').value,
       fontSize: +document.getElementById('font-size').value,
       theme: document.getElementById('theme').value,
       restoreTabs: document.getElementById('restore-tabs').checked,
       autoConnect: document.getElementById('auto-connect').checked,
+    };
+    const res = await fetch('/api/settings/appearance', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      ...appearance,
     })});
     setStatus('appearance-status', res.ok ? 'ok' : 'error', res.ok ? 'Appearance saved' : await res.text());
+    if (res.ok && window.parent && window.parent !== window) {
+      window.parent.postMessage({type: 'womprat-appearance', ...appearance}, window.location.origin);
+    }
   } catch (err) {
     setStatus('appearance-status', 'error', `Appearance save failed: ${err.message}`);
   }
@@ -877,8 +919,8 @@ function renderDiagnostics(data) {
     name.className = 'diag-name';
     name.textContent = check.name || 'Check';
     const status = document.createElement('div');
-    status.className = `diag-status ${check.status === 'ok' ? 'ok' : 'error'}`;
-    status.textContent = check.status === 'ok' ? 'OK' : 'Error';
+    status.className = `diag-status ${check.status === 'ok' ? 'ok' : check.status === 'skip' ? 'skip' : 'error'}`;
+    status.textContent = check.status === 'ok' ? 'OK' : check.status === 'skip' ? 'Skipped' : 'Error';
     const detail = document.createElement('div');
     detail.className = 'diag-detail mono';
     detail.textContent = check.detail || '—';
@@ -896,7 +938,7 @@ async function runDiagnostics() {
     if (!res.ok) { setStatus('diag-status', 'error', await res.text()); return; }
     const data = await res.json();
     renderDiagnostics(data);
-    const failed = (data.checks || []).filter(c => c.status !== 'ok').length;
+    const failed = (data.checks || []).filter(c => c.status === 'error').length;
     setStatus('diag-status', failed ? 'error' : 'ok', failed ? `${failed} diagnostic check(s) failed` : 'All diagnostics passed');
   } catch (err) {
     setStatus('diag-status', 'error', `Diagnostics failed: ${err.message}`);
@@ -932,6 +974,8 @@ async function loadAbout() {
 async function loadConfigSettings() {
   const cfg = await fetchJSON('/api/settings/config', {});
   applyUnlockSelection(cfg.unlockMethod);
+  const terminalFont = document.getElementById('terminal-font');
+  if (terminalFont) terminalFont.value = cfg.terminalFont || 'fira-code';
   const fontSize = document.getElementById('font-size');
   if (fontSize) fontSize.value = cfg.fontSize || 14;
   const theme = document.getElementById('theme');
