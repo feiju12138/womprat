@@ -35,6 +35,8 @@ The app starts an embedded Tailscale node through `tailscale.com/tsnet` and uses
 
 Release builds fail closed: if the embedded Tailscale node is unavailable, SSH, browser, download, VNC, and RDP traffic is not silently sent over the host's normal network. The `WOMPRAT_DIRECT=1` bypass exists only in binaries explicitly built with `-X main.debugBuild=1` for local integration tests.
 
+Transient control-plane or DNS failures during startup are retried in the background. Diagnostics report the last connection error while retrying. The public-internet SOCKS probe is skipped when no exit node is configured, because that is the expected tailnet-only mode rather than a connectivity failure.
+
 ## What is in the binary
 
 The executable contains the app shell, settings UI, tab manager, SSH terminal plumbing, SOCKS bridge, VNC/RDP viewers, embedded Tailscale client, and system WebView2 integration code. It does not bundle a browser engine -- it uses the Microsoft Edge WebView2 runtime already present on current Windows systems.
@@ -52,7 +54,7 @@ The main pieces are:
 
 ## Browser tabs
 
-HTTP and HTTPS URLs open in native WebView2 child views, with the shell keeping tab titles, favicons, address-bar state, navigation history, zoom, ordering, and optional launch-time restoration in sync. The usual browser shortcuts work (`Ctrl+L`, `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, `Ctrl+1` through `Ctrl+9`, `Ctrl+R`/`F5`, `Alt+Left`/`Alt+Right`, and `Ctrl++`/`Ctrl+-`/`Ctrl+0`). Terminal tabs use the corresponding `Ctrl+Shift` variants where a plain `Ctrl` chord belongs to the remote shell.
+HTTP and HTTPS URLs open in native WebView2 child views, with the shell keeping tab titles, favicons, address-bar state, navigation history, zoom, ordering, and optional launch-time restoration in sync. The usual browser shortcuts work (`Ctrl+L`, `Ctrl+T`, `Ctrl+W`, `Ctrl+Tab`, `Ctrl+1` through `Ctrl+9`, `Ctrl+R`/`F5`, `Alt+Left`/`Alt+Right`, and `Ctrl++`/`Ctrl+-`/`Ctrl+0`). Terminal tabs use the corresponding `Ctrl+Shift` variants where a plain `Ctrl` chord belongs to the remote shell. In particular, `Ctrl+C` sends the terminal interrupt character; copying and pasting remain available from the terminal's right-click menu.
 
 Links opened with `target=_blank` and common `window.open()` calls become Womprat tabs. Download links are handed to the managed downloader, which preserves the `tsnet` route, sanitises filenames, avoids overwriting an existing file, removes incomplete files, and reports progress in the shell.
 
@@ -79,6 +81,8 @@ Raw → Hextile → CopyRect → ZRLE → RRE → CoRRE → Cursor → ExtendedD
 
 VNC input supports pointer, wheel, clipboard, bounded cursor/desktop-name data, keypad keysyms, F1-F24, Meta/OS keysyms for NeXT-like targets, and active-key release on blur/reconnect/dispose to avoid stuck modifiers.
 
+Servers using standard VNC password authentication prompt for their password inside the VNC tab and reconnect without storing it. Authentication modes outside RFB `None` and classic VNC password authentication are reported in the tab status.
+
 ### RDP
 
 RDP credentials are entered in a centred dialog. Once Connect is pressed, the dialog hides and the canvas is displayed. Status is shown in an auto-sized bottom-left bar styled like the browser status bar. Fit-to-viewport is the default display mode.
@@ -96,6 +100,8 @@ User data lives (for now) under:
 ```
 
 `config.enc` contains the encrypted application state, including window geometry, open tabs, host metadata, appearance, exit-node choice, and diagnostics preferences. WebView2 maintains its browser profile below the same directory; runtime debug logs, when enabled, are written next to the executable.
+
+Entries added under Settings > Hosts are local Womprat host profiles stored in `config.enc`. They can add a manual target or override a discovered peer's browser URL, but they do not create or modify devices in the Tailscale control plane.
 
 Current unlock modes are intentionally simple:
 
