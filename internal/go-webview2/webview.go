@@ -121,8 +121,10 @@ func NewWithOptions(options WebViewOptions) WebView {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// disable context menu
-	err = settings.PutAreDefaultContextMenusEnabled(options.Debug)
+	// xterm.js uses the native context menu to copy its selection and dispatch
+	// paste events through its hidden textarea. Keep menus available in release
+	// builds; developer tooling remains controlled separately by Debug below.
+	err = settings.PutAreDefaultContextMenusEnabled(true)
 	if err != nil {
 		log.Fatal(err)
 	}
