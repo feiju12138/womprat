@@ -226,10 +226,16 @@ func TestShellEvalDispatchesToUIThread(t *testing.T) {
 func TestTailscaleStartupUsesBoundedContext(t *testing.T) {
 	s := readFileForRegression(t, "main.go")
 	for _, want := range []string{
-		"tailscaleUpTimeout = 30 * time.Second",
+		"tailscaleUpTimeout",
+		"30 * time.Second",
+		"tailscaleRetryInterval",
+		"15 * time.Second",
 		"context.WithTimeout(context.Background(), tailscaleUpTimeout)",
 		"ts.Up(upCtx)",
 		"defer cancelUp()",
+		"scheduleTailscaleRetry()",
+		"func (a *App) scheduleTailscaleRetry()",
+		"errors.Is(err, errNoTailscaleAuthKey)",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("Tailscale startup timeout guard missing %q", want)
@@ -237,6 +243,53 @@ func TestTailscaleStartupUsesBoundedContext(t *testing.T) {
 	}
 	if strings.Contains(s, "ts.Up(context.Background())") {
 		t.Fatal("Tailscale startup must not use an unbounded background context")
+	}
+}
+
+func TestTailscaleStatusReportsRetryFailure(t *testing.T) {
+	main := readFileForRegression(t, "main.go")
+	settings := readFileForRegression(t, "frontend/settings.html")
+	for _, want := range []string{
+		"tsLastError",
+		`"retrying": retrying`,
+		`"error": lastError`,
+	} {
+		if !strings.Contains(main, want) {
+			t.Fatalf("Tailscale retry status missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		"id=\"ts-error\"",
+		"data.retrying ? 'Reconnecting…' : 'Disconnected'",
+		"error.textContent = data.error || ''",
+		"if (data.retrying) tailscaleStatusTimer = setTimeout(checkTailscale, 2000);",
+	} {
+		if !strings.Contains(settings, want) {
+			t.Fatalf("Tailscale retry UI missing %q", want)
+		}
+	}
+}
+
+func TestDiagnosticsSkipPublicProbeWithoutExitNode(t *testing.T) {
+	diag := readFileForRegression(t, "diagnostics.go")
+	settings := readFileForRegression(t, "frontend/settings.html")
+	for _, want := range []string{
+		"hasExitNode := strings.TrimSpace(a.config.ExitNode) != \"\"",
+		"Status: \"skip\"",
+		"no exit node configured; public internet is intentionally unavailable in tailnet-only mode",
+	} {
+		if !strings.Contains(diag, want) {
+			t.Fatalf("diagnostics exit-node awareness missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		".diag-status.skip{color:var(--dim)}",
+		"check.status === 'skip'",
+		"filter(c => c.status === 'error')",
+	} {
+		if !strings.Contains(settings, want) {
+			t.Fatalf("diagnostics skip rendering missing %q", want)
+		}
 	}
 }
 
@@ -706,13 +759,16 @@ func TestSettingsHostsTableUsesSafeDOMConstruction(t *testing.T) {
 	for _, want := range []string{
 		"input.onchange = () => updateHost(p.name, 'url', input.value);",
 		"open.onclick = () => openHostURL(input.value);",
+		"remove.onclick = () => deleteHost(p.name || '');",
+		"async function deleteHost(host)",
+		"This does not remove the device from Tailscale.",
 		"tr.append(name, urlCell, status, actions);",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("settings hosts DOM rendering missing %q", want)
 		}
 	}
-	for _, forbidden := range []string{"onchange=\"updateHost", "onclick=\"openHostURL"} {
+	for _, forbidden := range []string{"onchange=\"updateHost", "onclick=\"openHostURL", "onclick=\"deleteHost"} {
 		if strings.Contains(s, forbidden) {
 			t.Fatalf("settings hosts table must not template inline handler %q", forbidden)
 		}
@@ -822,6 +878,16 @@ func TestNativeHostResizesEmbeddedShellWebView(t *testing.T) {
 	}
 }
 
+func TestReleaseWebViewKeepsContextMenusEnabled(t *testing.T) {
+	wrapper := readFileForRegression(t, "../../internal/go-webview2/webview.go")
+	if !strings.Contains(wrapper, "PutAreDefaultContextMenusEnabled(true)") {
+		t.Fatal("release WebView must keep native context menus enabled for terminal copy and paste")
+	}
+	if !strings.Contains(wrapper, "PutAreDevToolsEnabled(options.Debug)") {
+		t.Fatal("WebView developer tools must remain controlled by the debug setting")
+	}
+}
+
 func TestShellUsesWindowQualifiedNativeBindings(t *testing.T) {
 	s := readFileForRegression(t, "frontend/index.html")
 	for _, forbidden := range []string{
@@ -923,7 +989,8 @@ func TestRemoteDisplayNegotiationDefaultsPreferPerformance(t *testing.T) {
 	vnc := readFileForRegression(t, "frontend/vnc.js")
 	for _, want := range []string{
 		"return [0, 5, 1, 16, 2, 4, -239, -307, -224, -223, -308];",
-		"if (values.length > 0)\n    return values;",
+		"if (values.length > 0)",
+		"return values;",
 	} {
 		if !strings.Contains(vnc, want) {
 			t.Fatalf("VNC compatibility encoding order missing %q", want)
@@ -1260,8 +1327,9 @@ func TestRemoteDisplayCanvasesUseSmoothScaling(t *testing.T) {
 		".vnc-panel{position:relative;flex:1;display:grid;grid-template-rows:minmax(0,1fr);",
 		".rdp-panel{position:relative;flex:1;display:grid;grid-template-rows:minmax(0,1fr);",
 		".vnc-toolbar{display:none!important}",
+		".vnc-statusbar,.rdp-statusbar{position:absolute;z-index:4;left:0;bottom:0;",
+		".vnc-panel[data-vnc-auth-required] .vnc-dialog{display:flex}",
 		".vnc-viewport,.rdp-viewport{position:relative;z-index:1;min-height:0;min-width:0;display:grid;place-items:center;overflow:hidden;contain:layout paint",
-		".rdp-statusbar{position:absolute;z-index:4;left:0;bottom:0;width:max-content;max-width:calc(100% - 2rem);height:2.5em;background:var(--surface-solid);border:1px solid var(--border);border-left:0;border-bottom:0;display:inline-flex;align-items:center;padding:0 1rem;gap:.8rem;font-size:.82em",
 		".rdp-status::before{content:none!important}",
 		".rdp-viewport{display:none}.rdp-panel[data-connecting] .rdp-viewport,.rdp-panel[data-connected] .rdp-viewport{display:grid}",
 		".vnc-viewport canvas,.rdp-viewport canvas{display:block;box-sizing:border-box;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;image-rendering:auto",
@@ -1291,7 +1359,7 @@ func TestVNCKeyboardMappingCoversKeypadAndReleasesModifiers(t *testing.T) {
 		"for (let i2 = 1;i2 <= 24; i2 += 1)",
 		"KeyboardEvent.DOM_KEY_LOCATION_NUMPAD",
 		"releaseActiveKeys()",
-		"this.releaseActiveKeys();\n    try { this.ws?.close(1000, \"reconnect\")",
+		"try { this.ws?.close(1000, \"reconnect\")",
 		"window.removeEventListener(\"blur\", this.windowBlurHandler)",
 	} {
 		if !strings.Contains(s, want) {
@@ -1309,6 +1377,44 @@ func TestVNCSessionControlsGateOnConnection(t *testing.T) {
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("VNC session control gating missing %q", want)
+		}
+	}
+}
+
+func TestVNCPasswordPromptCanReconnect(t *testing.T) {
+	shell := readFileForRegression(t, "frontend/index.html")
+	vnc := readFileForRegression(t, "frontend/vnc.js")
+	for _, want := range []string{
+		"class=\"vnc-dialog\" role=\"dialog\" aria-label=\"VNC authentication\"",
+		"data-vnc-connect class=\"icon-button text-button vnc-connect\"",
+		"data-vnc-status>Preparing VNC",
+	} {
+		if !strings.Contains(shell, want) {
+			t.Fatalf("VNC password prompt markup missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		"this.root.dataset.vncAuthRequired = \"1\";",
+		"this.root.hasAttribute(\"data-vnc-auth-required\")",
+		"connect?.addEventListener(\"click\", () => this.reconnect());",
+		"this.root.dataset.connected = \"1\";",
+	} {
+		if !strings.Contains(vnc, want) {
+			t.Fatalf("VNC password prompt behavior missing %q", want)
+		}
+	}
+}
+
+func TestDynamicTabTitlesPreserveHoveredTabElement(t *testing.T) {
+	s := readFileForRegression(t, "frontend/index.html")
+	for _, want := range []string{
+		"function updateRenderedTab(tab, refreshIcon = false)",
+		"if (!updateRenderedTab(t)) renderTabs();",
+		"if (!updateRenderedTab(tab)) renderTabs();",
+		"if (!updateRenderedTab(tab, faviconChanged)) renderTabs();",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("stable tab-title update missing %q", want)
 		}
 	}
 }
@@ -1486,6 +1592,82 @@ func TestTerminalDoesNotSwallowUnimplementedSearchShortcut(t *testing.T) {
 	}
 	if !strings.Contains(s, "console.warn('terminal WebGL addon unavailable'") {
 		t.Fatal("terminal WebGL addon fallback should be logged")
+	}
+}
+
+func TestTerminalCtrlCSendsInterrupt(t *testing.T) {
+	s := readFileForRegression(t, "frontend/index.html")
+	for _, want := range []string{
+		"ev.type === 'keydown' && ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey && key === 'c'",
+		"term.input('\\x03', true);",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("terminal Ctrl+C interrupt handling missing %q", want)
+		}
+	}
+}
+
+func TestNewBlankTabCreatesVisibleTab(t *testing.T) {
+	s := readFileForRegression(t, "frontend/index.html")
+	start := strings.Index(s, "window.newBlankTab = function()")
+	if start < 0 {
+		t.Fatal("could not locate newBlankTab implementation")
+	}
+	end := strings.Index(s[start:], "\n};")
+	if end < 0 {
+		t.Fatal("could not locate newBlankTab implementation end")
+	}
+	body := s[start : start+end]
+	for _, want := range []string{
+		"title: 'New tab', url: 'about:blank'",
+		"state.tabs.push(tab);",
+		"activateTab(tab.id, { skipNative: true });",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("new blank tab implementation missing %q", want)
+		}
+	}
+	if strings.Contains(body, "state.activeTab = null") {
+		t.Fatal("new blank tab must not clear the active tab without creating a replacement")
+	}
+	for _, want := range []string{
+		"function isBlankBrowserTab(tab)",
+		"if (isBlankBrowserTab(tab)) {",
+		"if (isBlankBrowserTab(tab)) urlInput.value = '';",
+		"if (!tab || isBlankBrowserTab(tab)) return '';",
+		"if (t.id != null && t.id !== '' && !validTabID(t.id)) return null;",
+		"skipNative: !!replaceTabId",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("blank tab lifecycle missing %q", want)
+		}
+	}
+}
+
+func TestTerminalAppearanceAndTabDropAreWired(t *testing.T) {
+	shell := readFileForRegression(t, "frontend/index.html")
+	settings := readFileForRegression(t, "frontend/settings.html")
+	for _, want := range []string{
+		"const TERMINAL_FONT_FAMILIES = Object.freeze({",
+		"fontSize: terminalAppearance.fontSize",
+		"fontFamily: TERMINAL_FONT_FAMILIES[terminalAppearance.terminalFont]",
+		"loadTerminalAppearance().then(hydrateNativeTabs);",
+		"function tabDropBeforeID(fromId, targetId, afterTarget)",
+		"remaining[targetIndex + 1]?.id || ''",
+		"(beforeId && !validTabID(beforeId))",
+	} {
+		if !strings.Contains(shell, want) {
+			t.Fatalf("terminal appearance or tab drop wiring missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		"id=\"terminal-font\"",
+		"terminalFont: document.getElementById('terminal-font').value",
+		"type: 'womprat-appearance'",
+	} {
+		if !strings.Contains(settings, want) {
+			t.Fatalf("terminal font setting missing %q", want)
+		}
 	}
 }
 
@@ -1691,7 +1873,7 @@ func TestRecentTabsAreDedupedByCanonicalTarget(t *testing.T) {
 		"if (!clean || !key || seen.has(key)) continue;",
 		"const tabs = dedupeRecentTabs(cfg.openTabs || []);",
 		"const tabs = dedupeRecentTabs(state.tabs).slice(0, 100);",
-		"if (clean.type === 'vnc' || clean.type === 'rdp') return `${clean.type}:${String(clean.url || '').toLowerCase()}`;",
+		"if (tab.type === 'vnc' || tab.type === 'rdp') return `${tab.type}:${String(tab.url || '').toLowerCase()}`;",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("recent tab dedupe missing %q", want)
@@ -1778,7 +1960,8 @@ func TestFrontendValidatesTabIDsBeforeDOMUse(t *testing.T) {
 		"function validTabID(id)",
 		"function newLocalTabID(prefix)",
 		"const tabId = validTabID(options.id) ? options.id : newLocalTabID('term');",
-		"if (!t || t.id === 'settings' || !validTabID(t.id)) return null;",
+		"if (!t || t.id === 'settings') return null;",
+		"if (t.id != null && t.id !== '' && !validTabID(t.id)) return null;",
 		"if (!validTabID(fromId) || !validTabID(beforeId) || fromId === beforeId) return;",
 		"validTabID(t.id)",
 	} {
