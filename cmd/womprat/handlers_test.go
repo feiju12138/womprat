@@ -188,11 +188,13 @@ func TestHostAndAppearanceHandlersDoNotChangeMemoryOnPersistFailure(t *testing.T
 	app := newTestApp(t)
 	app.config.Hosts["smith"] = HostConfig{User: "old", Port: 22}
 	app.config.FontSize = 14
+	app.config.TerminalFont = "consolas"
 	blocked := filepath.Join(t.TempDir(), "blocked")
 	if err := os.WriteFile(blocked, []byte("x"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", blocked)
+	t.Setenv("APPDATA", blocked)
 
 	rr := performJSON(app.handleHosts, "PATCH", "/api/settings/hosts/smith", map[string]any{"user": "new", "port": 2222})
 	if rr.Code != http.StatusInternalServerError {
@@ -201,18 +203,26 @@ func TestHostAndAppearanceHandlersDoNotChangeMemoryOnPersistFailure(t *testing.T
 	if got := app.config.Hosts["smith"]; got.User != "old" || got.Port != 22 {
 		t.Fatalf("host changed despite persist failure: %+v", got)
 	}
+	rr = performJSON(app.handleHosts, http.MethodDelete, "/api/settings/hosts/smith", nil)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("host delete persist failure = %d %s", rr.Code, rr.Body.String())
+	}
+	if _, ok := app.config.Hosts["smith"]; !ok {
+		t.Fatal("host deleted from memory despite persist failure")
+	}
 
-	rr = performJSON(app.handleAppearance, "POST", "/api/settings/appearance", map[string]any{"fontSize": 16, "theme": "dark", "restoreTabs": true, "autoConnect": true})
+	rr = performJSON(app.handleAppearance, "POST", "/api/settings/appearance", map[string]any{"fontSize": 16, "terminalFont": "nsimsun", "theme": "dark", "restoreTabs": true, "autoConnect": true})
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("appearance persist failure = %d %s", rr.Code, rr.Body.String())
 	}
-	if app.config.FontSize != 14 || app.config.RestoreTabs || app.config.AutoConnect {
+	if app.config.FontSize != 14 || app.config.TerminalFont != "consolas" || app.config.RestoreTabs || app.config.AutoConnect {
 		t.Fatalf("appearance changed despite persist failure: %+v", app.config)
 	}
 }
 
 func TestHostsAppearanceAndSaveTabsHandlers(t *testing.T) {
 	app := newTestApp(t)
+	t.Setenv("APPDATA", t.TempDir())
 	rr := performJSON(app.handleHosts, "PATCH", "/api/settings/hosts/smith", map[string]any{"user": "rui", "port": 2222, "nickname": "Smith", "url": "http://smith"})
 	if rr.Code != 200 {
 		t.Fatalf("patch host = %d %s", rr.Code, rr.Body.String())
@@ -236,13 +246,24 @@ func TestHostsAppearanceAndSaveTabsHandlers(t *testing.T) {
 	if rr.Code != 200 || !strings.Contains(rr.Body.String(), "smith") {
 		t.Fatalf("get hosts = %d %s", rr.Code, rr.Body.String())
 	}
+	rr = performJSON(app.handleHosts, http.MethodDelete, "/api/settings/hosts/smith", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("delete host = %d %s", rr.Code, rr.Body.String())
+	}
+	if _, ok := app.config.Hosts["smith"]; ok {
+		t.Fatal("deleted host remains in config")
+	}
+	rr = performJSON(app.handleHosts, http.MethodDelete, "/api/settings/hosts/bad/extra", nil)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("bad host delete path = %d %s", rr.Code, rr.Body.String())
+	}
 
-	rr = performJSON(app.handleAppearance, "POST", "/api/settings/appearance", map[string]any{"fontSize": 16, "theme": "light", "restoreTabs": true, "autoConnect": true})
-	if rr.Code != 200 || app.config.FontSize != 16 || app.config.Theme != "dark" || !app.config.RestoreTabs || !app.config.AutoConnect {
+	rr = performJSON(app.handleAppearance, "POST", "/api/settings/appearance", map[string]any{"fontSize": 16, "terminalFont": "nsimsun", "theme": "light", "restoreTabs": true, "autoConnect": true})
+	if rr.Code != 200 || app.config.FontSize != 16 || app.config.TerminalFont != "nsimsun" || app.config.Theme != "dark" || !app.config.RestoreTabs || !app.config.AutoConnect {
 		t.Fatalf("appearance = %d %+v", rr.Code, app.config)
 	}
-	rr = performJSON(app.handleAppearance, "POST", "/api/settings/appearance", map[string]any{"fontSize": 99, "theme": "light"})
-	if rr.Code != 200 || app.config.FontSize != 0 || app.config.Theme != "dark" {
+	rr = performJSON(app.handleAppearance, "POST", "/api/settings/appearance", map[string]any{"fontSize": 99, "terminalFont": "unknown", "theme": "light"})
+	if rr.Code != 200 || app.config.FontSize != 0 || app.config.TerminalFont != defaultTerminalFont || app.config.Theme != "dark" {
 		t.Fatalf("appearance bounds = %d %+v", rr.Code, app.config)
 	}
 
