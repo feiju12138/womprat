@@ -188,6 +188,7 @@ func (a *App) handleSetTailscaleKey(w http.ResponseWriter, r *http.Request) {
 	}
 	// Restart tailscale with new key
 	if err := a.startTailscale(); err != nil {
+		a.scheduleTailscaleRetry()
 		writeJSON(w, http.StatusOK, map[string]interface{}{"status": "saved", "error": err.Error()})
 		return
 	}
@@ -198,6 +199,9 @@ func (a *App) handleTailscaleDisconnect(w http.ResponseWriter, r *http.Request) 
 	if !requirePOST(w, r) {
 		return
 	}
+	a.stopTailscaleRetry()
+	a.tsStartMu.Lock()
+	defer a.tsStartMu.Unlock()
 	a.mu.Lock()
 	ts := a.tsServer
 	a.tsServer = nil
@@ -371,6 +375,24 @@ func (a *App) handleHosts(w http.ResponseWriter, r *http.Request) {
 		a.config.Hosts[host] = conf
 		a.mu.Unlock()
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	case http.MethodDelete:
+		host, err := resourceNameFromPath(r.URL.Path, "/api/settings/hosts/")
+		if err != nil || validateCustomURLHost("ssh", host) != nil {
+			http.Error(w, "invalid host", http.StatusBadRequest)
+			return
+		}
+		a.mu.Lock()
+		cfg := cloneConfig(a.config)
+		delete(cfg.Hosts, host)
+		a.mu.Unlock()
+		if err := SaveConfig(cfg); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		a.mu.Lock()
+		delete(a.config.Hosts, host)
+		a.mu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -383,10 +405,11 @@ func (a *App) handleAppearance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		FontSize    int    `json:"fontSize"`
-		Theme       string `json:"theme"`
-		RestoreTabs bool   `json:"restoreTabs"`
-		AutoConnect bool   `json:"autoConnect"`
+		FontSize     int    `json:"fontSize"`
+		TerminalFont string `json:"terminalFont"`
+		Theme        string `json:"theme"`
+		RestoreTabs  bool   `json:"restoreTabs"`
+		AutoConnect  bool   `json:"autoConnect"`
 	}
 	if !decodeSettingsJSON(w, r, &body) {
 		return
@@ -395,6 +418,7 @@ func (a *App) handleAppearance(w http.ResponseWriter, r *http.Request) {
 	cfg := cloneConfig(a.config)
 	a.mu.Unlock()
 	cfg.FontSize = normalizeFontSize(body.FontSize)
+	cfg.TerminalFont = normalizeTerminalFont(body.TerminalFont)
 	cfg.Theme = normalizeTheme(body.Theme)
 	cfg.RestoreTabs = body.RestoreTabs
 	cfg.AutoConnect = body.AutoConnect
@@ -404,6 +428,7 @@ func (a *App) handleAppearance(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	a.config.FontSize = cfg.FontSize
+	a.config.TerminalFont = cfg.TerminalFont
 	a.config.Theme = cfg.Theme
 	a.config.RestoreTabs = cfg.RestoreTabs
 	a.config.AutoConnect = cfg.AutoConnect
